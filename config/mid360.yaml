@@ -1,50 +1,96 @@
 /**:
     ros__parameters:
+        # 是否在建图前启用边缘/平面特征提取。
+        # 对 MID360 + FAST_LIO2，通常关闭即可。
         feature_extract_enable: false
+        # 输入点云抽样倍率，每 N 个点保留 1 个。
+        # 数值越大，CPU 占用越低，但点云细节也会减少。
         point_filter_num: 3
+        # 每帧点云状态估计的最大迭代次数。
         max_iteration: 3
+        # 局部扫描面点的体素滤波尺寸，单位米。
         filter_size_surf: 0.5
+        # 地图体素滤波尺寸，单位米。
         filter_size_map: 0.5
+        # 局部地图立方体边长，单位米。
         cube_side_length: 1000.0
+        # 是否输出 FAST_LIO 运行时位姿日志。
         runtime_pos_log_enable: false
-        map_file_path: "./test.pcd"
-
+        # 保存地图 PCD 文件的输出路径。
+        map_file_path: "/home/nano/ws_fastlio/maps/mid360_map_01.pcd"
         common:
+            # LiDAR 点云话题名。
             lid_topic:  "/livox/lidar"
+            # FAST_LIO 使用的 IMU 话题名。
             imu_topic:  "/livox/imu"
-            time_sync_en: false         # ONLY turn on when external time synchronization is really not possible
-            time_offset_lidar_to_imu: 0.0 # Time offset between lidar and IMU calibrated by other algorithms, e.g. LI-Init (can be found in README).
-                                        # This param will take effect no matter what time_sync_en is. So if the time offset is not known exactly, please set as 0.0
+            # 是否启用 LiDAR 和 IMU 的内部软件时间同步。
+            # 如果已经有硬件同步，或外部时间同步可靠，建议保持 false。
+            # 只有在确实无法做外部同步时才考虑打开。
+            time_sync_en: false
+            # LiDAR 到 IMU 的固定时间偏移，单位秒。
+            # 这个参数不受 time_sync_en 开关影响，会始终生效。
+            # 如果没有经过标定，请保持为 0.0。
+            time_offset_lidar_to_imu: 0.0
 
         preprocess:
-            lidar_type: 1                # 1 for Livox serials LiDAR, 2 for Velodyne LiDAR, 3 for ouster LiDAR, 4 for any other pointcloud input
+            # 雷达类型：
+            # 1: Livox, 2: Velodyne, 3: Ouster, 4: 通用 PointCloud 输入
+            lidar_type: 1
+            # 扫描线数。当前这份 MID360 配置按 4 线处理。
             scan_line:  4
+            # 最小有效测距，单位米。小于该距离的点会被丢弃。
             blind: 0.5
+            # 输入点云时间戳单位。
+            # 对当前仓库中的 Livox CustomMsg，这里通常使用 3。
             timestamp_unit: 3
+            # 雷达扫描频率，单位 Hz。
             scan_rate: 10
 
         mapping:
+            # 加速度计噪声协方差。
             acc_cov: 0.1
+            # 陀螺仪噪声协方差。
             gyr_cov: 0.1
+            # 加速度计零偏随机游走协方差。
             b_acc_cov: 0.0001
+            # 陀螺仪零偏随机游走协方差。
             b_gyr_cov: 0.0001
+            # 建图过程中考虑的有效视场角。
             fov_degree:    360.0
+            # 最大检测/匹配范围，单位米。
             det_range:     100.0
-            extrinsic_est_en:  true      # true: enable the online estimation of IMU-LiDAR extrinsic
+            # 是否在线估计 LiDAR 和 IMU 的外参。
+            # 对稳定的实机平台，测好外参后改成 false，通常会比长期在线估计更可控。
+            extrinsic_est_en:  false
+            # LiDAR 坐标系到 IMU/body 坐标系的平移，单位米。
+            # 这也说明 FAST_LIO 里的 body 并不是 LiDAR 坐标系。
             extrinsic_T: [ -0.011, -0.02329, 0.04412 ]
+            # LiDAR 坐标系到 IMU/body 坐标系的旋转。
+            # 这里按行优先方式填写 3x3 旋转矩阵。
+            # 当前是单位阵，表示初始假设 LiDAR 与 IMU 轴向一致。
             extrinsic_R: [ 1., 0., 0.,
                             0., 1., 0.,
                             0., 0., 1.]
 
         publish:
-            path_en: true                # true: publish Path
-            effect_map_en: false         # true: publish Effects
-            map_en: true                 # true: publish Map cloud
-            scan_publish_en:  true       # false: close all the point cloud output
-            dense_publish_en: false      # false: low down the points number in a global-frame point clouds scan.
-            scan_bodyframe_pub_en: true  # true: output the point cloud scans in IMU-body-frame
+            # 是否发布估计轨迹 Path。
+            path_en: true
+            # 是否发布算法内部使用的有效点/效果点。
+            effect_map_en: false
+            # 是否发布全局地图点云。
+            map_en: true
+            # 点云输出总开关。
+            scan_publish_en:  true
+            # 是否发布更稠密的全局坐标系扫描点云。
+            # 关闭后可降低带宽和 CPU 压力。
+            dense_publish_en: false
+            # 是否发布 body 坐标系下的扫描点云。
+            # 注意：这个工程里的 body 指 IMU/body 坐标系，不是 LiDAR 坐标系。
+            scan_bodyframe_pub_en: true
 
         pcd_save:
+            # 是否将累计点云保存到磁盘。
             pcd_save_en: true
-            interval: -1                 # how many LiDAR frames saved in each pcd file; 
-                                        # -1 : all frames will be saved in ONE pcd file, may lead to memory crash when having too much frames.
+            # 每个 PCD 文件保存多少帧 LiDAR 数据。
+            # -1 表示全部保存到一个文件里，数据多时可能占用大量内存。
+            interval: -1
